@@ -2,6 +2,7 @@ import { Action, ActionPanel, Detail } from "@raycast/api";
 import { useFetch } from "@raycast/utils";
 import { useMemo } from "react";
 import * as cheerio from "cheerio";
+import { useSettings } from "./settings";
 
 export function WordTranslation({ word, lang, baseUrl }: { word: string; lang: string; baseUrl: string }) {
   const { isLoading, markdown, url } = useWordTranslation({ word, lang, baseUrl });
@@ -22,6 +23,7 @@ export function WordTranslation({ word, lang, baseUrl }: { word: string; lang: s
 
 function useWordTranslation({ word, baseUrl }: { word: string; lang: string; baseUrl: string }) {
   const url = `https://www.wordreference.com/${baseUrl}/${word}`;
+  const { translation } = useSettings();
 
   const { data: rawData, isLoading } = useFetch<string>(url, {
     method: "GET",
@@ -37,23 +39,47 @@ function useWordTranslation({ word, baseUrl }: { word: string; lang: string; bas
     }
     const data = parseRawData(rawData);
     let markdown = "";
+    // markdown += `*Showing results for :*\n`;
+    markdown += `# ${word}\n\n`;
+    markdown += "|  | |  |  |\n";
+    markdown += `|--|--|--|--|\n`;
+
+    // data.forEach((item) => {
+    //   // Add word
+    //   markdown += `## **${item.from.word}** *${item.from.type}*\n`;
+    //   markdown += `*${item.from.definition}*\n\n`;
+
+    //   // Add translations
+    //   item.to.forEach((toItem) => {
+    //     markdown += `- **${toItem.word}** (${toItem.type})\n`;
+    //     markdown += `  *${toItem.definition}*\n`;
+    //   });
+    //   markdown += "\n";
+
+    //   if (item.example && Object.keys(item.example).length) {
+    //     markdown += `> ${item.example.from}\n`;
+    //     markdown += `> ${item.example.to}\n\n`;
+    //   }
+    // });
 
     data.forEach((item) => {
+      const firstTranslation = item.to.shift();
+      if (!firstTranslation) {
+        return;
+      }
       // Add word
-      markdown += `### **${item.from.word}** *${item.from.type}*\n`;
-      markdown += `*${item.from.definition}*\n\n`;
+      markdown += `| **${item.from.word}** *${item.from.type}* | ${item.from.definition} | ${firstTranslation.definition} | **${firstTranslation.word}** *${firstTranslation.type}* |\n`;
 
       // Add translations
       item.to.forEach((toItem) => {
-        markdown += `- **${toItem.word}** (${toItem.type})\n`;
-        markdown += `  *${toItem.definition}*\n`;
+        markdown += `| | | ${toItem.definition} | **${toItem.word}** ${toItem.type} |\n`;
       });
-      markdown += "\n";
 
       if (item.example && Object.keys(item.example).length) {
-        markdown += `> ${item.example.from}\n`;
-        markdown += `> ${item.example.to}\n\n`;
+        markdown += `${item.example.from}\n`;
+        markdown += `${item.example.to}\n`;
       }
+      markdown += "| | | | |\n";
     });
     return markdown;
   }, [rawData, isLoading]);
@@ -68,7 +94,7 @@ function parseRawData(rawData: string): Translation[] {
   let currentTranslation: Translation | null = null;
 
   // Loop through each 'tr' in the div with the id 'articleWRD'
-  $("#articleWRD tr").each((_, element) => {
+  $("#articleWRD tr:not(.langHeader)").each((_, element) => {
     // If the tr has an id, it's the start of a new translation
     if ($(element).attr("id")) {
       // If there is a current translation, push it to data
@@ -77,24 +103,27 @@ function parseRawData(rawData: string): Translation[] {
       }
 
       // Start a new translation
-      const fromTerm = $(element).find(".FrWrd strong").text().trim();
+      const fromWord = $(element).find(".FrWrd strong").text().trim();
       const fromType = $(element).find(".FrWrd .POS2").text().trim();
-      const toDefinition = $(element).find("td:eq(1) .dense").text().trim();
 
       $(element).find("td:eq(1) span.dense").remove();
-      const fromDefinition = $(element).find("td:eq(1)").text().trim();
-      const toTerm = $(element).find(".ToWrd").text().trim();
+      const definition = $(element).find("td:eq(1)");
+      const toWord = $(element).find(".ToWrd").text().trim();
       const toType = $(element).find(".ToWrd .POS2").text().trim();
+
+      const toDefinition = $(definition).find("span").text().trim();
+      definition.remove("span");
+      const fromDefinition = $(definition).text().trim();
 
       currentTranslation = {
         from: {
-          word: fromTerm,
+          word: fromWord,
           type: fromType,
           definition: fromDefinition,
         },
         to: [
           {
-            word: toTerm,
+            word: toWord,
             type: toType,
             definition: toDefinition,
           },
@@ -105,13 +134,13 @@ function parseRawData(rawData: string): Translation[] {
       // If the tr does not have an id, it's a continuation of the current translation
 
       // Get 'to' words
-      const toTerm = $(element).find(".ToWrd").text().trim();
+      const toWord = $(element).find(".ToWrd").text().trim();
       const toType = $(element).find(".ToWrd .POS2").text().trim();
       const toDefinition = $(element).find(".To2 span").text().trim();
 
-      if (toTerm) {
+      if (toWord) {
         currentTranslation.to.push({
-          word: toTerm,
+          word: toWord,
           type: toType,
           definition: toDefinition,
         });
@@ -120,9 +149,15 @@ function parseRawData(rawData: string): Translation[] {
       // Get 'example' object
       const fromExample = $(element).find(".FrEx").text().trim();
       const toExample = $(element).find(".ToEx").text().trim();
-      if (fromExample && toExample) {
+      if (fromExample) {
         currentTranslation.example = {
           from: fromExample,
+          to: currentTranslation.example?.to || "",
+        };
+      }
+      if (toExample) {
+        currentTranslation.example = {
+          from: currentTranslation.example?.from || "",
           to: toExample,
         };
       }
