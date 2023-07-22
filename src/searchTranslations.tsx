@@ -11,8 +11,9 @@ import {
   useNavigation,
 } from "@raycast/api";
 import { useFetch } from "@raycast/utils";
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { WordTranslation } from "./translationDetails";
+import Settings, { useSettings } from "./settings";
 
 export default function Command() {
   const navigation = useNavigation();
@@ -20,29 +21,76 @@ export default function Command() {
   const { searchText, setSearchText, translations } = useSearchTranslations();
   const { addRecentSearch, clearRecentSearches, recentSearches, removeRecentSearch } = useRecentSearches();
 
+  const { shouldShowSettings, loadSettings, settings, translation } = useSettings();
+
+  if (shouldShowSettings) {
+    return (
+      <Settings
+        onDone={() => {
+          loadSettings();
+        }}
+      />
+    );
+  }
+
   return (
-    <List onSearchTextChange={setSearchText} actions={<ActionPanel></ActionPanel>} filtering={false}>
+    <List
+      onSearchTextChange={setSearchText}
+      actions={
+        <ActionPanel>
+          <Action
+            title="Settings"
+            onAction={() => {
+              navigation.push(
+                <Settings
+                  onDone={() => {
+                    loadSettings();
+                  }}
+                  popOnDone
+                />
+              );
+            }}
+            icon={Icon.Gear}
+          />
+        </ActionPanel>
+      }
+      filtering={false}
+      searchBarPlaceholder={`Search from ${translation.from} to ${translation.to} words`}
+    >
       {searchText ? (
         <List.Section title="Results">
           {translations.map((translation, index) => (
             <List.Item
               key={index}
-              title={translation.term}
+              title={translation.word}
               subtitle={translation.lang}
               actions={
                 <ActionPanel>
-                  <Action
-                    title="Show Translation"
-                    onAction={() => {
-                      addRecentSearch(translation.term, translation.lang);
-                      navigation.push(<WordTranslation word={translation.term} lang={translation.lang} />);
-                    }}
-                  />
-                  <Action.OpenInBrowser
-                    url={`https://www.wordreference.com/${translation.lang === "fr" ? "fren" : "enfr"}/${
-                      translation.term
-                    }`}
-                  />
+                  <ActionPanel.Section title={translation.word}>
+                    <DetailActions
+                      word={translation.word}
+                      lang={translation.lang}
+                      translationKey={settings.translationKey}
+                      onSelect={() => {
+                        addRecentSearch(translation.word, translation.lang);
+                      }}
+                    />
+                  </ActionPanel.Section>
+                  <ActionPanel.Section>
+                    <Action
+                      title="Settings"
+                      onAction={() => {
+                        navigation.push(
+                          <Settings
+                            onDone={() => {
+                              loadSettings();
+                            }}
+                          />
+                        );
+                      }}
+                      icon={Icon.Gear}
+                    />
+                  </ActionPanel.Section>
                 </ActionPanel>
               }
             />
@@ -50,28 +98,22 @@ export default function Command() {
         </List.Section>
       ) : (
         <List.Section title="Recent Searches">
-          {recentSearches.map((recentSearch, index) => (
+          {recentSearches.map(({ word, lang }, index) => (
             <List.Item
               key={index}
-              title={recentSearch.term}
-              subtitle={recentSearch.lang}
+              title={word}
+              subtitle={lang}
               actions={
                 <ActionPanel>
-                  <ActionPanel.Section title={recentSearch.term}>
-                    <Action
-                      title="Show Translation"
-                      onAction={() => {
-                        navigation.push(<WordTranslation word={recentSearch.term} lang={recentSearch.lang} />);
+                  <ActionPanel.Section title={word}>
+                    <DetailActions
+                      word={word}
+                      lang={lang}
+                      translationKey={settings.translationKey}
+                      onSelect={() => {
+                        addRecentSearch(word, lang);
                       }}
-                      icon={Icon.ChevronRight}
                     />
-                    <Action.OpenInBrowser
-                      url={`https://www.wordreference.com/${recentSearch.lang === "fr" ? "fren" : "enfr"}/${
-                        recentSearch.term
-                      }`}
-                    />
-                  </ActionPanel.Section>
-                  <ActionPanel.Section>
                     <Action
                       title="Delete"
                       onAction={() => {
@@ -80,6 +122,21 @@ export default function Command() {
                       icon={Icon.Trash}
                       shortcut={{ modifiers: ["ctrl"], key: "x" }}
                       style={Action.Style.Destructive}
+                    />
+                  </ActionPanel.Section>
+                  <ActionPanel.Section>
+                    <Action
+                      title="Settings"
+                      onAction={() => {
+                        navigation.push(
+                          <Settings
+                            onDone={() => {
+                              loadSettings();
+                            }}
+                          />
+                        );
+                      }}
+                      icon={Icon.Gear}
                     />
                     <Action
                       title="Clear Recent Searches"
@@ -101,6 +158,37 @@ export default function Command() {
   );
 }
 
+function DetailActions({
+  word,
+  lang,
+  translationKey,
+  onSelect,
+}: {
+  word: string;
+  lang: string;
+  translationKey: string;
+  onSelect?: () => void;
+}) {
+  const navigation = useNavigation();
+  const key = translationKey;
+  const otherLang = key.replace(lang, "");
+  const urlTranslationKey = lang + otherLang;
+  const url = `https://www.wordreference.com/${urlTranslationKey}/${word}`;
+
+  return (
+    <Fragment>
+      <Action
+        title="Show Translation"
+        onAction={() => {
+          onSelect?.();
+          navigation.push(<WordTranslation word={word} lang={lang} baseUrl={urlTranslationKey} />);
+        }}
+        icon={Icon.ChevronRight}
+      />
+      <Action.OpenInBrowser url={url} />
+    </Fragment>
+  );
+}
 function useSearchTranslations() {
   const [searchText, setSearchText] = useState("");
 
@@ -118,8 +206,8 @@ function useSearchTranslations() {
     const result = [];
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
-      const [term, lang] = line.split("\t");
-      result.push({ term, lang });
+      const [word, lang] = line.split("\t");
+      result.push({ word, lang });
     }
 
     return result;
@@ -129,7 +217,7 @@ function useSearchTranslations() {
 }
 
 function useRecentSearches() {
-  const [recentSearches, setRecentSearches] = useState<{ term: string; lang: string }[]>([]);
+  const [recentSearches, setRecentSearches] = useState<{ word: string; lang: string }[]>([]);
 
   async function loadRecentSearches() {
     const recentSearchesString = await LocalStorage.getItem<string>("recentSearches");
@@ -142,11 +230,11 @@ function useRecentSearches() {
     await LocalStorage.setItem("recentSearches", JSON.stringify(recentSearches));
   }
 
-  const addRecentSearch = (term: string, lang: string) => {
+  const addRecentSearch = (word: string, lang: string) => {
     const newRecentSearches = recentSearches.filter(
-      (recentSearch) => recentSearch.term !== term && recentSearch.lang !== lang
+      (recentSearch) => recentSearch.word !== word && recentSearch.lang !== lang
     );
-    newRecentSearches.unshift({ term, lang });
+    newRecentSearches.unshift({ word, lang });
     setRecentSearches(newRecentSearches);
   };
 

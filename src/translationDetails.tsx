@@ -3,8 +3,8 @@ import { useFetch } from "@raycast/utils";
 import { useMemo } from "react";
 import * as cheerio from "cheerio";
 
-export function WordTranslation({ word, lang }: { word: string; lang: string }) {
-  const { isLoading, markdown, url } = useWordTranslation({ word, lang });
+export function WordTranslation({ word, lang, baseUrl }: { word: string; lang: string; baseUrl: string }) {
+  const { isLoading, markdown, url } = useWordTranslation({ word, lang, baseUrl });
 
   return (
     <Detail
@@ -20,8 +20,8 @@ export function WordTranslation({ word, lang }: { word: string; lang: string }) 
   );
 }
 
-function useWordTranslation({ word, lang }: { word: string; lang: string }) {
-  const url = `https://www.wordreference.com/${lang === "fr" ? "fren" : "enfr"}/${word}`;
+function useWordTranslation({ word, baseUrl }: { word: string; lang: string; baseUrl: string }) {
+  const url = `https://www.wordreference.com/${baseUrl}/${word}`;
 
   const { data: rawData, isLoading } = useFetch<string>(url, {
     method: "GET",
@@ -39,13 +39,13 @@ function useWordTranslation({ word, lang }: { word: string; lang: string }) {
     let markdown = "";
 
     data.forEach((item) => {
-      // Add term
-      markdown += `### **${item.from.term}** *${item.from.type}*\n`;
+      // Add word
+      markdown += `### **${item.from.word}** *${item.from.type}*\n`;
       markdown += `*${item.from.definition}*\n\n`;
 
       // Add translations
       item.to.forEach((toItem) => {
-        markdown += `- **${toItem.term}** (${toItem.type})\n`;
+        markdown += `- **${toItem.word}** (${toItem.type})\n`;
         markdown += `  *${toItem.definition}*\n`;
       });
       markdown += "\n";
@@ -88,13 +88,13 @@ function parseRawData(rawData: string): Translation[] {
 
       currentTranslation = {
         from: {
-          term: fromTerm,
+          word: fromTerm,
           type: fromType,
           definition: fromDefinition,
         },
         to: [
           {
-            term: toTerm,
+            word: toTerm,
             type: toType,
             definition: toDefinition,
           },
@@ -111,7 +111,7 @@ function parseRawData(rawData: string): Translation[] {
 
       if (toTerm) {
         currentTranslation.to.push({
-          term: toTerm,
+          word: toTerm,
           type: toType,
           definition: toDefinition,
         });
@@ -144,7 +144,7 @@ interface Translation {
 }
 
 interface Word {
-  term: string;
+  word: string;
   type: string;
   definition: string;
 }
