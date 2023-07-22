@@ -12,7 +12,7 @@
   "license": "MIT",
   "commands": [
     {
-      "name": "translation",
+      "name": "searchTranslations",
       "title": "Translate Word",
       "subtitle": "WordReference",
       "description": "Translate a word and find its definitions using WordReference",
