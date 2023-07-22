@@ -1,4 +1,15 @@
-import { Action, ActionPanel, Icon, List, LocalStorage, useNavigation } from "@raycast/api";
+import {
+  Action,
+  ActionPanel,
+  Alert,
+  Icon,
+  List,
+  LocalStorage,
+  Toast,
+  confirmAlert,
+  showToast,
+  useNavigation,
+} from "@raycast/api";
 import { useFetch } from "@raycast/utils";
 import { useEffect, useMemo, useState } from "react";
 import { WordTranslation } from "./translationDetails";
@@ -46,33 +57,40 @@ export default function Command() {
               subtitle={recentSearch.lang}
               actions={
                 <ActionPanel>
-                  <Action
-                    title="Show Translation"
-                    onAction={() => {
-                      navigation.push(<WordTranslation word={recentSearch.term} lang={recentSearch.lang} />);
-                    }}
-                  />
-                  <Action.OpenInBrowser
-                    url={`https://www.wordreference.com/${recentSearch.lang === "fr" ? "fren" : "enfr"}/${
-                      recentSearch.term
-                    }`}
-                  />
-                  <Action
-                    title="Delete"
-                    onAction={() => {
-                      removeRecentSearch(index);
-                    }}
-                    icon={Icon.Trash}
-                    shortcut={{ modifiers: ["cmd"], key: "d" }}
-                  />
-                  <Action
-                    title="Delete All"
-                    onAction={() => {
-                      clearRecentSearches();
-                    }}
-                    icon={Icon.Eraser}
-                    shortcut={{ modifiers: ["cmd", "shift"], key: "d" }}
-                  />
+                  <ActionPanel.Section title={recentSearch.term}>
+                    <Action
+                      title="Show Translation"
+                      onAction={() => {
+                        navigation.push(<WordTranslation word={recentSearch.term} lang={recentSearch.lang} />);
+                      }}
+                      icon={Icon.ChevronRight}
+                    />
+                    <Action.OpenInBrowser
+                      url={`https://www.wordreference.com/${recentSearch.lang === "fr" ? "fren" : "enfr"}/${
+                        recentSearch.term
+                      }`}
+                    />
+                  </ActionPanel.Section>
+                  <ActionPanel.Section>
+                    <Action
+                      title="Delete"
+                      onAction={() => {
+                        removeRecentSearch(index);
+                      }}
+                      icon={Icon.Trash}
+                      shortcut={{ modifiers: ["ctrl"], key: "x" }}
+                      style={Action.Style.Destructive}
+                    />
+                    <Action
+                      title="Clear Recent Searches"
+                      onAction={() => {
+                        clearRecentSearches();
+                      }}
+                      icon={Icon.Trash}
+                      shortcut={{ modifiers: ["ctrl", "shift"], key: "x" }}
+                      style={Action.Style.Destructive}
+                    />
+                  </ActionPanel.Section>
                 </ActionPanel>
               }
             />
@@ -136,10 +154,23 @@ function useRecentSearches() {
     const newRecentSearches = [...recentSearches];
     newRecentSearches.splice(index, 1);
     setRecentSearches(newRecentSearches);
+    showToast({ title: "Successfully deleted", style: Toast.Style.Success });
   };
 
-  const clearRecentSearches = () => {
-    setRecentSearches([]);
+  const clearRecentSearches = async () => {
+    await confirmAlert({
+      title: "Clear Recent Searches",
+      message: "Are you sure you want to clear all recent searches?",
+      icon: Icon.Trash,
+      primaryAction: {
+        title: "Clear",
+        onAction: () => {
+          setRecentSearches([]);
+          showToast({ title: "Successfully deleted", style: Toast.Style.Success });
+        },
+        style: Alert.ActionStyle.Destructive,
+      },
+    });
   };
 
   useEffect(() => {
