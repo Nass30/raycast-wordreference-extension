@@ -10,27 +10,19 @@ import {
   showToast,
   useNavigation,
 } from "@raycast/api";
-import { useFetch } from "@raycast/utils";
+import { useCachedState, useFetch } from "@raycast/utils";
 import { Fragment, useEffect, useMemo, useState } from "react";
-import { WordTranslation } from "./translationDetails";
 import Settings, { useSettings } from "./settings";
+import { WordTranslation } from "./translationDetails";
 
 export default function Command() {
-  const navigation = useNavigation();
-
+  const { shouldShowSettings, settings, translation } = useSettings();
   const { searchText, setSearchText, translations } = useSearchTranslations();
-  const { addRecentSearch, clearRecentSearches, recentSearches, removeRecentSearch } = useRecentSearches();
 
-  const { shouldShowSettings, loadSettings, settings, translation } = useSettings();
+  const { clearRecentSearches, recentSearches, removeRecentSearch } = useRecentSearches();
 
   if (shouldShowSettings) {
-    return (
-      <Settings
-        onDone={() => {
-          loadSettings();
-        }}
-      />
-    );
+    return <Settings />;
   }
 
   return (
@@ -38,20 +30,7 @@ export default function Command() {
       onSearchTextChange={setSearchText}
       actions={
         <ActionPanel>
-          <Action
-            title="Settings"
-            onAction={() => {
-              navigation.push(
-                <Settings
-                  onDone={() => {
-                    loadSettings();
-                  }}
-                  popOnDone
-                />
-              );
-            }}
-            icon={Icon.Gear}
-          />
+          <SettingsAction />
         </ActionPanel>
       }
       filtering={false}
@@ -71,25 +50,10 @@ export default function Command() {
                       word={translation.word}
                       lang={translation.lang}
                       translationKey={settings.translationKey}
-                      onSelect={() => {
-                        addRecentSearch(translation.word, translation.lang);
-                      }}
                     />
                   </ActionPanel.Section>
                   <ActionPanel.Section>
-                    <Action
-                      title="Settings"
-                      onAction={() => {
-                        navigation.push(
-                          <Settings
-                            onDone={() => {
-                              loadSettings();
-                            }}
-                          />
-                        );
-                      }}
-                      icon={Icon.Gear}
-                    />
+                    <SettingsAction />
                   </ActionPanel.Section>
                 </ActionPanel>
               }
@@ -98,7 +62,7 @@ export default function Command() {
         </List.Section>
       ) : (
         <List.Section title="Recent Searches">
-          {recentSearches.map(({ word, lang }, index) => (
+          {recentSearches?.map(({ word, lang }, index) => (
             <List.Item
               key={index}
               title={word}
@@ -106,14 +70,7 @@ export default function Command() {
               actions={
                 <ActionPanel>
                   <ActionPanel.Section title={word}>
-                    <DetailActions
-                      word={word}
-                      lang={lang}
-                      translationKey={settings.translationKey}
-                      onSelect={() => {
-                        addRecentSearch(word, lang);
-                      }}
-                    />
+                    <DetailActions word={word} lang={lang} translationKey={settings.translationKey} />
                     <Action
                       title="Delete"
                       onAction={() => {
@@ -125,19 +82,7 @@ export default function Command() {
                     />
                   </ActionPanel.Section>
                   <ActionPanel.Section>
-                    <Action
-                      title="Settings"
-                      onAction={() => {
-                        navigation.push(
-                          <Settings
-                            onDone={() => {
-                              loadSettings();
-                            }}
-                          />
-                        );
-                      }}
-                      icon={Icon.Gear}
-                    />
+                    <SettingsAction />
                     <Action
                       title="Clear Recent Searches"
                       onAction={() => {
@@ -158,17 +103,8 @@ export default function Command() {
   );
 }
 
-function DetailActions({
-  word,
-  lang,
-  translationKey,
-  onSelect,
-}: {
-  word: string;
-  lang: string;
-  translationKey: string;
-  onSelect?: () => void;
-}) {
+function DetailActions({ word, lang, translationKey }: { word: string; lang: string; translationKey: string }) {
+  const { addRecentSearch } = useRecentSearches();
   const navigation = useNavigation();
   const key = translationKey;
   const otherLang = key.replace(lang, "");
@@ -180,8 +116,8 @@ function DetailActions({
       <Action
         title="Show Translation"
         onAction={() => {
-          onSelect?.();
           navigation.push(<WordTranslation word={word} lang={lang} baseUrl={urlTranslationKey} />);
+          addRecentSearch({ word, lang, translationKey: urlTranslationKey });
         }}
         icon={Icon.ChevronRight}
       />
@@ -189,13 +125,33 @@ function DetailActions({
     </Fragment>
   );
 }
+
+function SettingsAction() {
+  const navigation = useNavigation();
+
+  return (
+    <Action
+      title="Settings"
+      onAction={() => {
+        navigation.push(<Settings popOnDone />);
+      }}
+      shortcut={{ modifiers: ["ctrl"], key: "," }}
+      icon={Icon.Gear}
+    />
+  );
+}
+
 function useSearchTranslations() {
   const [searchText, setSearchText] = useState("");
+  const { settings } = useSettings();
 
-  const { data } = useFetch<string>("https://www.wordreference.com/autocomplete?dict=enfr&query=" + searchText, {
-    method: "GET",
-    keepPreviousData: true,
-  });
+  const { data } = useFetch<string>(
+    `https://www.wordreference.com/autocomplete?dict=${settings.translationKey}&query=${searchText}`,
+    {
+      method: "GET",
+      keepPreviousData: true,
+    }
+  );
 
   const translations = useMemo(() => {
     if (!data) {
@@ -216,33 +172,44 @@ function useSearchTranslations() {
   return { searchText, setSearchText, translations };
 }
 
+interface RecentSearch {
+  word: string;
+  lang: string;
+  translationKey: string;
+}
+
 function useRecentSearches() {
-  const [recentSearches, setRecentSearches] = useState<{ word: string; lang: string }[]>([]);
+  const [recentSearches, setRecentSearches] = useCachedState<
+    { word: string; lang: string; translationKey: string }[] | undefined
+  >("recentSearches", undefined);
 
   async function loadRecentSearches() {
     const recentSearchesString = await LocalStorage.getItem<string>("recentSearches");
     if (recentSearchesString) {
       setRecentSearches(JSON.parse(recentSearchesString));
+    } else {
+      setRecentSearches([]);
     }
   }
 
-  async function saveRecentSearches() {
-    await LocalStorage.setItem("recentSearches", JSON.stringify(recentSearches));
+  async function saveRecentSearches(searches: RecentSearch[]) {
+    await LocalStorage.setItem("recentSearches", JSON.stringify(searches));
   }
 
-  const addRecentSearch = (word: string, lang: string) => {
-    const newRecentSearches = recentSearches.filter(
-      (recentSearch) => recentSearch.word !== word && recentSearch.lang !== lang
-    );
-    newRecentSearches.unshift({ word, lang });
+  const addRecentSearch = ({ word, lang, translationKey }: { word: string; lang: string; translationKey: string }) => {
+    const newRecentSearches =
+      recentSearches?.filter((recentSearch) => recentSearch.word !== word || recentSearch.lang !== lang) || [];
+    newRecentSearches.unshift({ word, lang, translationKey });
     setRecentSearches(newRecentSearches);
+    saveRecentSearches(newRecentSearches);
   };
 
   const removeRecentSearch = (index: number) => {
-    const newRecentSearches = [...recentSearches];
+    const newRecentSearches = recentSearches ? [...recentSearches] : [];
     newRecentSearches.splice(index, 1);
     setRecentSearches(newRecentSearches);
     showToast({ title: "Successfully deleted", style: Toast.Style.Success });
+    saveRecentSearches(newRecentSearches);
   };
 
   const clearRecentSearches = async () => {
@@ -254,6 +221,7 @@ function useRecentSearches() {
         title: "Clear",
         onAction: () => {
           setRecentSearches([]);
+          saveRecentSearches([]);
           showToast({ title: "Successfully deleted", style: Toast.Style.Success });
         },
         style: Alert.ActionStyle.Destructive,
@@ -262,12 +230,8 @@ function useRecentSearches() {
   };
 
   useEffect(() => {
-    loadRecentSearches();
-  }, []);
-
-  useEffect(() => {
-    saveRecentSearches();
-  }, [recentSearches]);
+    if (!recentSearches) loadRecentSearches();
+  }, [recentSearches === undefined]);
 
   return { recentSearches, addRecentSearch, removeRecentSearch, clearRecentSearches };
 }

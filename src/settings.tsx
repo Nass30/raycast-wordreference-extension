@@ -1,14 +1,14 @@
 import { Action, ActionPanel, Form, LocalStorage, Toast, showToast, useNavigation } from "@raycast/api";
 import { useEffect, useState } from "react";
 import translationDictionaries from "./data/translationDictionaries.json";
+import { useCachedState } from "@raycast/utils";
 import translationKeyMap from "./data/translationKeyMap.json";
 
 interface SettingsViewProps {
-  onDone: () => void;
   popOnDone?: boolean;
 }
 
-export default function Settings({ onDone, popOnDone }: SettingsViewProps) {
+export default function Settings({ popOnDone }: SettingsViewProps) {
   const { settings, setSettings } = useSettings();
   const navigation = useNavigation();
 
@@ -26,7 +26,6 @@ export default function Settings({ onDone, popOnDone }: SettingsViewProps) {
       },
     };
     setSettings(newSettings);
-    onDone();
     if (popOnDone) {
       navigation.pop();
     }
@@ -63,10 +62,9 @@ const defaultSettings: Settings = {
 };
 
 export function useSettings() {
-  const [settings, setSettings] = useState<Settings>(defaultSettings);
-  const [shouldShowSettings, setShouldShowSettings] = useState<boolean>(false);
-
-  const translation = translationKeyMap[settings.translationKey as keyof typeof translationKeyMap];
+  // This hook will be used in multiple places, so we need to make sure it's cached, and to load the data only once
+  const [settings, setSettings] = useCachedState<Settings | undefined>("settings", defaultSettings);
+  const [shouldShowSettings, setShouldShowSettings] = useCachedState<boolean>("shouldShowSettings", false);
 
   const _setSettings = async (newSettings: Settings) => {
     setSettings(newSettings);
@@ -98,10 +96,14 @@ export function useSettings() {
 
   useEffect(() => {
     loadSettings();
-  }, []);
+  }, [settings === undefined]);
+
+  const translationKey = (settings?.translationKey || defaultSettings.translationKey) as keyof typeof translationKeyMap;
+  const translation = translationKeyMap[translationKey];
 
   return {
-    settings,
+    // Always return settings if undefined, and fetch them inside the hook
+    settings: settings || defaultSettings,
     setSettings: _setSettings,
     shouldShowSettings,
     loadSettings,
