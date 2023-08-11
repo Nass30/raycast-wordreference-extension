@@ -7,23 +7,20 @@ import {
   LocalStorage,
   Toast,
   confirmAlert,
+  openExtensionPreferences,
   showToast,
   useNavigation,
 } from "@raycast/api";
 import { useCachedState, useFetch } from "@raycast/utils";
 import { Fragment, useEffect, useMemo, useState } from "react";
-import Settings, { useSettings } from "./settings";
 import { WordTranslation } from "./translationDetails";
+import usePreferences from "./hooks/preferences";
 
 export default function Command() {
-  const { shouldShowSettings, settings, translation } = useSettings();
+  const { preferences, translation } = usePreferences();
   const { searchText, setSearchText, translations } = useSearchTranslations();
 
   const { clearRecentSearches, recentSearches, removeRecentSearch } = useRecentSearches();
-
-  if (shouldShowSettings) {
-    return <Settings />;
-  }
 
   return (
     <List
@@ -49,7 +46,7 @@ export default function Command() {
                     <DetailActions
                       word={translation.word}
                       lang={translation.lang}
-                      translationKey={settings.translationKey}
+                      translationKey={preferences.translationKey}
                     />
                   </ActionPanel.Section>
                   <ActionPanel.Section>
@@ -70,7 +67,7 @@ export default function Command() {
               actions={
                 <ActionPanel>
                   <ActionPanel.Section title={word}>
-                    <DetailActions word={word} lang={lang} translationKey={settings.translationKey} />
+                    <DetailActions word={word} lang={lang} translationKey={preferences.translationKey} />
                     <Action
                       title="Delete"
                       onAction={() => {
@@ -127,14 +124,10 @@ function DetailActions({ word, lang, translationKey }: { word: string; lang: str
 }
 
 function SettingsAction() {
-  const navigation = useNavigation();
-
   return (
     <Action
       title="Settings"
-      onAction={() => {
-        navigation.push(<Settings popOnDone />);
-      }}
+      onAction={openExtensionPreferences}
       shortcut={{ modifiers: ["ctrl"], key: "," }}
       icon={Icon.Gear}
     />
@@ -143,10 +136,10 @@ function SettingsAction() {
 
 function useSearchTranslations() {
   const [searchText, setSearchText] = useState("");
-  const { settings } = useSettings();
+  const { preferences } = usePreferences();
 
   const { data } = useFetch<string>(
-    `https://www.wordreference.com/autocomplete?dict=${settings.translationKey}&query=${searchText}`,
+    `https://www.wordreference.com/autocomplete?dict=${preferences.translationKey}&query=${searchText}`,
     {
       method: "GET",
       keepPreviousData: true,
