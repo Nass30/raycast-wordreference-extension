@@ -2,15 +2,13 @@
 
 All notable changes to "Raycast WordReference Extension" will be documented in this file.
 
-## [Unreleased]
-
-- Initial development and features.
-
-## [1.0.0] - 2023-07-22
-
-### Added
+## [1.0.0] - 2023-08-11
 
 - Initial release of Raycast WordReference Extension.
 - Quick and easy translation feature.
 - Integration with Raycast.
-- Only French to English translation is supported in this release.
+
+### Added
+
+- Multilanguage translation [French - Spanish - Portuguese - Italian - German - Dutch - Swedish - Icelandic (They have no enemies) - Russian - Polish - Romamian - Czech - Greek - Turkish - Chinese - Japanese - Korean - Arabic]
+- Recent searches features 
