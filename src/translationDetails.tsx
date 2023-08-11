@@ -66,45 +66,6 @@ function useWordTranslation({ word, baseUrl }: { word: string; lang: string; bas
         markdown += `> ${item.example.to}\n\n`;
       }
     });
-    // markdown += "|  | |  |  |\n";
-    // markdown += `|--|--|--|--|\n`;
-    // data.forEach((item) => {
-    //   // Add word
-    //   markdown += `## **${item.from.word}** *${item.from.type}*\n`;
-    //   markdown += `*${item.from.definition}*\n\n`;
-
-    //   // Add translations
-    //   item.to.forEach((toItem) => {
-    //     markdown += `- **${toItem.word}** (${toItem.type})\n`;
-    //     markdown += `  *${toItem.definition}*\n`;
-    //   });
-    //   markdown += "\n";
-
-    //   if (item.example && Object.keys(item.example).length) {
-    //     markdown += `> ${item.example.from}\n`;
-    //     markdown += `> ${item.example.to}\n\n`;
-    //   }
-    // });
-
-    // data.forEach((item) => {
-    //   const firstTranslation = item.to.shift();
-    //   if (!firstTranslation) {
-    //     return;
-    //   }
-    //   // Add word
-    //   markdown += `| **${item.from.word}** *${item.from.type}* | ${item.from.definition} | ${firstTranslation.definition} | **${firstTranslation.word}** *${firstTranslation.type}* |\n`;
-
-    //   // Add translations
-    //   item.to.forEach((toItem) => {
-    //     markdown += `| | | ${toItem.definition} | **${toItem.word}** ${toItem.type} |\n`;
-    //   });
-
-    //   if (item.example && Object.keys(item.example).length) {
-    //     markdown += `${item.example.from}\n`;
-    //     markdown += `${item.example.to}\n`;
-    //   }
-    //   markdown += "| | | | |\n";
-    // });
     return markdown;
   }, [rawData, isLoading]);
 
