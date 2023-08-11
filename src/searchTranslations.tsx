@@ -34,7 +34,7 @@ export default function Command() {
         </ActionPanel>
       }
       filtering={false}
-      searchBarPlaceholder={`Search from ${translation.from} to ${translation.to} words`}
+      searchBarPlaceholder={`Search ${translation.from} to ${translation.to} translations...`}
     >
       {searchText ? (
         <List.Section title="Results">

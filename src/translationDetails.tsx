@@ -50,12 +50,16 @@ function useWordTranslation({ word, baseUrl }: { word: string; lang: string; bas
 
       // Add translations
       markdown += `- **${firstTranslation.word}** (${firstTranslation.type})\n`;
-      markdown += `  *${firstTranslation.definition}*\n`;
+      if (firstTranslation.definition) {
+        markdown += `  *${firstTranslation.definition}*\n`;
+      }
       item.to.forEach((toItem) => {
-        markdown += `- **${toItem.word}** (${toItem.type})\n`;
-        markdown += `  *${toItem.definition}*\n`;
+        markdown += `- **${toItem.word}** (${toItem.type})`;
+        if (toItem.definition) {
+          markdown += `  *${toItem.definition}*`;
+        }
+        markdown += "\n";
       });
-      markdown += "\n";
 
       if (item.example && Object.keys(item.example).length) {
         markdown += `> ${item.example.from}\n\n`;
