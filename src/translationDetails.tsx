@@ -1,8 +1,7 @@
 import { Action, ActionPanel, Detail } from "@raycast/api";
 import { useFetch } from "@raycast/utils";
-import { useMemo } from "react";
 import * as cheerio from "cheerio";
-import { useSettings } from "./settings";
+import { useMemo } from "react";
 
 export function WordTranslation({ word, lang, baseUrl }: { word: string; lang: string; baseUrl: string }) {
   const { isLoading, markdown, url } = useWordTranslation({ word, lang, baseUrl });
@@ -23,7 +22,6 @@ export function WordTranslation({ word, lang, baseUrl }: { word: string; lang: s
 
 function useWordTranslation({ word, baseUrl }: { word: string; lang: string; baseUrl: string }) {
   const url = `https://www.wordreference.com/${baseUrl}/${word}`;
-  const { translation } = useSettings();
 
   const { data: rawData, isLoading } = useFetch<string>(url, {
     method: "GET",
@@ -39,11 +37,33 @@ function useWordTranslation({ word, baseUrl }: { word: string; lang: string; bas
     }
     const data = parseRawData(rawData);
     let markdown = "";
-    // markdown += `*Showing results for :*\n`;
     markdown += `# ${word}\n\n`;
-    markdown += "|  | |  |  |\n";
-    markdown += `|--|--|--|--|\n`;
 
+    data.forEach((item) => {
+      const firstTranslation = item.to.shift();
+      if (!firstTranslation) {
+        return;
+      }
+      // Add word
+      markdown += `## **${item.from.word}** *${item.from.type}*\n`;
+      markdown += `*${item.from.definition}*\n\n`;
+
+      // Add translations
+      markdown += `- **${firstTranslation.word}** (${firstTranslation.type})\n`;
+      markdown += `  *${firstTranslation.definition}*\n`;
+      item.to.forEach((toItem) => {
+        markdown += `- **${toItem.word}** (${toItem.type})\n`;
+        markdown += `  *${toItem.definition}*\n`;
+      });
+      markdown += "\n";
+
+      if (item.example && Object.keys(item.example).length) {
+        markdown += `> ${item.example.from}\n\n`;
+        markdown += `> ${item.example.to}\n\n`;
+      }
+    });
+    // markdown += "|  | |  |  |\n";
+    // markdown += `|--|--|--|--|\n`;
     // data.forEach((item) => {
     //   // Add word
     //   markdown += `## **${item.from.word}** *${item.from.type}*\n`;
@@ -62,25 +82,25 @@ function useWordTranslation({ word, baseUrl }: { word: string; lang: string; bas
     //   }
     // });
 
-    data.forEach((item) => {
-      const firstTranslation = item.to.shift();
-      if (!firstTranslation) {
-        return;
-      }
-      // Add word
-      markdown += `| **${item.from.word}** *${item.from.type}* | ${item.from.definition} | ${firstTranslation.definition} | **${firstTranslation.word}** *${firstTranslation.type}* |\n`;
+    // data.forEach((item) => {
+    //   const firstTranslation = item.to.shift();
+    //   if (!firstTranslation) {
+    //     return;
+    //   }
+    //   // Add word
+    //   markdown += `| **${item.from.word}** *${item.from.type}* | ${item.from.definition} | ${firstTranslation.definition} | **${firstTranslation.word}** *${firstTranslation.type}* |\n`;
 
-      // Add translations
-      item.to.forEach((toItem) => {
-        markdown += `| | | ${toItem.definition} | **${toItem.word}** ${toItem.type} |\n`;
-      });
+    //   // Add translations
+    //   item.to.forEach((toItem) => {
+    //     markdown += `| | | ${toItem.definition} | **${toItem.word}** ${toItem.type} |\n`;
+    //   });
 
-      if (item.example && Object.keys(item.example).length) {
-        markdown += `${item.example.from}\n`;
-        markdown += `${item.example.to}\n`;
-      }
-      markdown += "| | | | |\n";
-    });
+    //   if (item.example && Object.keys(item.example).length) {
+    //     markdown += `${item.example.from}\n`;
+    //     markdown += `${item.example.to}\n`;
+    //   }
+    //   markdown += "| | | | |\n";
+    // });
     return markdown;
   }, [rawData, isLoading]);
 
@@ -108,8 +128,15 @@ function parseRawData(rawData: string): Translation[] {
 
       $(element).find("td:eq(1) span.dense").remove();
       const definition = $(element).find("td:eq(1)");
-      const toWord = $(element).find(".ToWrd").text().trim();
-      const toType = $(element).find(".ToWrd .POS2").text().trim();
+      const toWordElement = $(element).find(".ToWrd");
+      const toType = $(toWordElement).find(".POS2").text().trim();
+      const toWord = $(toWordElement)
+        .contents()
+        .filter(function () {
+          return this.type === "text";
+        })
+        .text()
+        .trim();
 
       const toDefinition = $(definition).find("span").text().trim();
       definition.remove("span");
@@ -134,7 +161,14 @@ function parseRawData(rawData: string): Translation[] {
       // If the tr does not have an id, it's a continuation of the current translation
 
       // Get 'to' words
-      const toWord = $(element).find(".ToWrd").text().trim();
+      const toWord = $(element)
+        .find(".ToWrd")
+        .contents()
+        .filter(function () {
+          return this.type === "text";
+        })
+        .text()
+        .trim();
       const toType = $(element).find(".ToWrd .POS2").text().trim();
       const toDefinition = $(element).find(".To2 span").text().trim();
 
