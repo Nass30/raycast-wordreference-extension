@@ -12,13 +12,13 @@ import {
   useNavigation,
 } from "@raycast/api";
 import { useCachedState, useFetch } from "@raycast/utils";
-import { Fragment, useEffect, useMemo, useState } from "react";
-import { WordTranslation } from "./translationDetails";
+import { Fragment, useEffect, useState } from "react";
 import usePreferences from "./hooks/preferences";
+import { WordTranslation } from "./translationDetails";
 
 export default function Command() {
   const { preferences, translation } = usePreferences();
-  const { searchText, setSearchText, translations } = useSearchTranslations();
+  const { searchText, setSearchText, data } = useSearchTranslations();
 
   const { clearRecentSearches, recentSearches, removeRecentSearch } = useRecentSearches();
 
@@ -35,7 +35,7 @@ export default function Command() {
     >
       {searchText ? (
         <List.Section title="Results">
-          {translations.map((translation, index) => (
+          {data?.map((translation, index) => (
             <List.Item
               key={index}
               title={translation.word}
@@ -138,31 +138,37 @@ function useSearchTranslations() {
   const [searchText, setSearchText] = useState("");
   const { preferences } = usePreferences();
 
-  const { data } = useFetch<string>(
-    `https://www.wordreference.com/autocomplete?dict=${preferences.translationKey}&query=${searchText}`,
+  const { data } = useFetch<{ word: string; lang: string }[] | undefined>(
+    `https://www.wordreference.com/autocomplete?dict=${preferences.translationKey}&query=${searchText.trim()}`,
     {
       method: "GET",
       keepPreviousData: true,
+      parseResponse: async (response) => {
+        if (response.status >= 400) {
+          return undefined;
+        }
+        const data = await response.text();
+        if (!data || data.length === 0) {
+          return undefined;
+        }
+        const lines = data.split("\n");
+        const result = [];
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          const [word, lang] = line.split("\t").map((s) => s.trim());
+          if (!word || !lang) {
+            continue;
+          }
+          result.push({ word, lang });
+        }
+        return result;
+      },
+      execute: !!searchText.trim(),
     }
   );
+  console.log(data);
 
-  const translations = useMemo(() => {
-    if (!data) {
-      return [];
-    }
-
-    const lines = data.split("\n");
-    const result = [];
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      const [word, lang] = line.split("\t");
-      result.push({ word, lang });
-    }
-
-    return result;
-  }, [data]);
-
-  return { searchText, setSearchText, translations };
+  return { searchText, setSearchText, data: data || [] };
 }
 
 interface RecentSearch {
