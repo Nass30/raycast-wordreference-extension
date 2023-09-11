@@ -48,7 +48,8 @@ export default function usePreferences() {
     loadPreferences();
   }, [preferences === undefined]);
 
-  const translationKey = (preferences?.translationKey || defaultPreferences.translationKey) as keyof typeof translationKeyMap;
+  const translationKey = (preferences?.translationKey ||
+    defaultPreferences.translationKey) as keyof typeof translationKeyMap;
   const translation = translationKeyMap[translationKey];
 
   return {
